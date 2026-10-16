@@ -1,15 +1,27 @@
 LiteGraph.clearRegisteredTypes();
 
-// 1. TEMEL EVENT VE DATA DÜĞÜMLERİ
-function EventMesaj() {
-    this.title = "Mesaj Gelince (Event)";
-    this.color = "#701010"; this.bgcolor = "#500a0a";
-    this.addOutput("Çalıştır", LiteGraph.EVENT);
-    this.addOutput("Kullanıcı ID", "string");
-    this.addOutput("Mesaj Metni", "string");
-}
-LiteGraph.registerNodeType("Botluyo_Events/Mesaj_Gelince", EventMesaj);
+// 1. TÜM EVENT (TETİKLEYİCİ) DÜĞÜMLERİ
+const BOT_EVENTS = {
+    "Mesaj_Gelince": { title: "Mesaj Gelince", action: "post/add", pins: { "user_id": "Kullanıcı ID", "channel_id": "Kanal ID", "message": "Mesaj Metni" } },
+    "Mention_Gelince": { title: "Mention Gelince", action: "post/mention", pins: { "user_id": "Kullanıcı ID", "channel_id": "Kanal ID", "message": "Mesaj Metni" } },
+    "Ozel_Mesaj_Gelince": { title: "Özel Mesaj Gelince", action: "message/send", pins: { "user_id": "Kullanıcı ID", "message": "Mesaj Metni" } },
+    "Turbo_Gelince": { title: "Turbo Gelince", action: "turbo/transfer", pins: { "user_id": "Kullanıcı ID", "message.quantity": "Miktar", "message.message": "Turbo Notu" } },
+    "Gruba_Katilma": { title: "Gruba Biri Katılınca", action: "group/join", pins: { "user_id": "Kullanıcı ID", "group_id": "Grup ID" } },
+    "Form_Gonderilince": { title: "Form Gönderilince", action: "post/bumote", pins: { "user_id": "Kullanıcı ID", "post_id": "Gönderi ID", "message.submit": "Buton Etiketi" } }
+};
 
+Object.keys(BOT_EVENTS).forEach(evKey => {
+    const evData = BOT_EVENTS[evKey];
+    function EvNode() {
+        this.title = evData.title;
+        this.color = "#701010"; this.bgcolor = "#500a0a";
+        this.addOutput("Çalıştır", LiteGraph.EVENT);
+        Object.values(evData.pins).forEach(pinName => this.addOutput(pinName, "string,number"));
+    }
+    LiteGraph.registerNodeType(`Botluyo_Events/${evKey}`, EvNode);
+});
+
+// 2. VERİ (DATA) VE YANIT ÇÖZÜCÜ DÜĞÜMLER
 function DataMetin() {
     this.title = "Metin (String)";
     this.color = "#333333"; this.bgcolor = "#1a1a1a";
@@ -28,7 +40,27 @@ function DataNumber() {
 }
 LiteGraph.registerNodeType("Botluyo_Data/Sayi", DataNumber);
 
-// 2. DİNAMİK API DÜĞÜMLERİ (api.js'den okur)
+function DataYanitAlani() {
+    this.title = "Nesneden Veri Al (JSON)";
+    this.color = "#2980b9"; this.bgcolor = "#1a5276";
+    this.addInput("Nesne (API Yanıtı)", "object");
+    this.addWidget("text", "Alan Adı (Örn: id)", "id", "value");
+    this.addOutput("Değer", "string,number");
+    this.serialize_widgets = true;
+}
+LiteGraph.registerNodeType("Botluyo_Data/Nesne_Verisi_Al", DataYanitAlani);
+
+function DataFormAlani() {
+    this.title = "Form Alanı Oku";
+    this.color = "#8e44ad"; this.bgcolor = "#5b2c6f";
+    this.addWidget("text", "Alan Adı", "isim", "value");
+    this.addOutput("Değer", "string,number");
+    this.serialize_widgets = true;
+}
+LiteGraph.registerNodeType("Botluyo_Data/Form_Alani", DataFormAlani);
+
+
+// 3. DİNAMİK API DÜĞÜMLERİ (Yanıt Pini Eklendi)
 let currentCategory = "Genel";
 let currentColorHue = 210;
 if(typeof API_LIST !== 'undefined') {
@@ -54,6 +86,7 @@ if(typeof API_LIST !== 'undefined') {
                     this.addInput(name, isNumber ? "number" : "string");
                 });
                 this.addOutput("Sonraki", LiteGraph.EVENT);
+                this.addOutput("Yanıt (Response)", "object"); // YENİ EKLENDİ
             }
             DynamicApiNode.title = title;
             DynamicApiNode.desc = `/!api/${endpoint}`;
@@ -62,12 +95,12 @@ if(typeof API_LIST !== 'undefined') {
     });
 }
 
-// 3. LITEGRAPH BAŞLATMA
+// 4. LITEGRAPH BAŞLATMA
 const graph = new LGraph();
 const canvas = new LGraphCanvas("#blueprint-canvas", graph);
 canvas.background_color = "#1e1e1e";
 
-// 4. DERLEYİCİ (RECURSIVE COMPILER)
+// 5. GELİŞMİŞ DERLEYİCİ (RECURSIVE COMPILER)
 function generateBotCode() {
     const data = graph.serialize();
     let code = "// Botluyo Blueprint ile otomatik oluşturuldu\n";
@@ -86,13 +119,36 @@ function generateBotCode() {
         let sourceNode = getNode(link[1]);
         let sourceSlot = link[2];
 
-        if (sourceNode.type === "Botluyo_Events/Mesaj_Gelince") {
-            if (sourceSlot === 1) return "data.user_id";
-            if (sourceSlot === 2) return "data.message";
+        // Event Verileri (Dinamik okuma)
+        if (sourceNode.type.startsWith("Botluyo_Events/")) {
+            let evKey = sourceNode.type.split("/")[1];
+            let evData = BOT_EVENTS[evKey];
+            if (evData) {
+                let pinKeys = Object.keys(evData.pins);
+                let actualKey = pinKeys[sourceSlot - 1]; // 0. slot EVENT, 1. slot ilk veri
+                if (actualKey) return `data.${actualKey}`;
+            }
         }
+
         if (sourceNode.type === "Botluyo_Data/Metin") return `'${sourceNode.widgets_values[0]}'`;
         if (sourceNode.type === "Botluyo_Data/Sayi") return sourceNode.widgets_values[0];
         
+        if (sourceNode.type === "Botluyo_Data/Nesne_Verisi_Al") {
+            let obj = resolveData(sourceNode.inputs[0]?.link) || "null";
+            let field = sourceNode.widgets_values[0];
+            return `(${obj}?.['${field}'])`;
+        }
+
+        if (sourceNode.type === "Botluyo_Data/Form_Alani") {
+            let field = sourceNode.widgets_values[0];
+            return `(data.message?.form?.['${field}'])`;
+        }
+        
+        // API Yanıtı Okuma
+        if (sourceNode.type.startsWith("API_")) {
+            if (sourceSlot === 1) return `res_${sourceNode.id}`; // Çalıştığı an oluşturulan değişkenden alır
+        }
+
         if (sourceNode.type === "Botluyo_Logic/Compare") {
             let op = sourceNode.widgets_values[0];
             let a = resolveData(sourceNode.inputs[0]?.link) || "null";
@@ -137,7 +193,8 @@ function generateBotCode() {
                     }
                 });
             }
-            blockCode += `${indent}await bot.post('/!api/${endpoint}', { ${reqData.join(', ')} });\n`;
+            // Artık düz bot.post yerine, API cevabını benzersiz bir değişkene atıyoruz
+            blockCode += `${indent}let res_${node.id} = await bot.post('/!api/${endpoint}', { ${reqData.join(', ')} });\n`;
         }
 
         let nextLink = node.outputs && node.outputs[0]?.links ? node.outputs[0].links[0] : null;
@@ -148,8 +205,10 @@ function generateBotCode() {
 
     const eventNodes = data.nodes.filter(n => n.type.startsWith("Botluyo_Events/"));
     eventNodes.forEach(eventNode => {
-        if (eventNode.type === "Botluyo_Events/Mesaj_Gelince") {
-            code += `bot.on('message', async (data) => {\n  if (data.action === 'post/add') {\n`;
+        let evKey = eventNode.type.split("/")[1];
+        let evData = BOT_EVENTS[evKey];
+        if (evData) {
+            code += `bot.on('message', async (data) => {\n  if (data.action === '${evData.action}') {\n`;
             let nextLinkInfo = eventNode.outputs && eventNode.outputs[0].links ? eventNode.outputs[0].links[0] : null;
             code += traverseExecution(nextLinkInfo ? getLink(nextLinkInfo)[3] : null, "    ");
             code += `  }\n});\n\n`;
@@ -159,10 +218,8 @@ function generateBotCode() {
     return code;
 }
 
-// 5. ARAYÜZ, KAYDETME VE ZIP SİSTEMİ
+// 6. ARAYÜZ, KAYDETME VE ZIP SİSTEMİ
 const STORAGE_KEY = "botluyo_v2_save";
-
-// Yükleme
 const savedData = localStorage.getItem(STORAGE_KEY);
 if (savedData) {
     graph.configure(JSON.parse(savedData));
@@ -171,7 +228,6 @@ if (savedData) {
 }
 graph.start();
 
-// Oto Kayıt
 setInterval(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(graph.serialize())); }, 5000);
 
 document.getElementById("btn-save").addEventListener("click", () => {
@@ -193,13 +249,10 @@ document.getElementById("btn-export").addEventListener("click", () => {
     box.textContent = code;
 });
 
-// ZIP Olarak Dışa Aktar
 document.getElementById("btn-download").addEventListener("click", () => {
     const code = generateBotCode();
     const zip = new JSZip();
-    
     zip.file("index.js", code);
-    
     const packageJson = {
         name: "botluyo-blueprint-bot",
         version: "1.0.0",
@@ -210,9 +263,6 @@ document.getElementById("btn-download").addEventListener("click", () => {
     zip.file("package.json", JSON.stringify(packageJson, null, 2));
     zip.file(".token.json", '\"BURAYA_TOKENINIZI_YAZIN\"');
     zip.file(".gitignore", ".token.json\nnode_modules/");
-    zip.file("README.md", "# Botluyo Blueprint Projesi\n\n1. Kodu çalıştırmak için terminale `npm install` yazın.\n2. Tokeninizi `.token.json` dosyasına tırnak işaretlerini bozmadan yazın.\n3. `npm start` ile botu çalıştırın.");
-
-    zip.generateAsync({type:"blob"}).then(function(content) {
-        saveAs(content, "botluyo-botum.zip");
-    });
+    zip.file("README.md", "# Botluyo Blueprint Projesi\n\n1. `npm install`\n2. `.token.json` dosyasini guncelle\n3. `npm start`");
+    zip.generateAsync({type:"blob"}).then(function(content) { saveAs(content, "botluyo-botum.zip"); });
 });
