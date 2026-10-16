@@ -42,7 +42,8 @@ const graph = new LGraph(); const canvas = new LGraphCanvas("#blueprint-canvas",
 
 function generateBotCode() {
     const data = graph.serialize();
-    let code = "// Botluyo Blueprint ile otomatik oluşturuldu\nconst TopluyoBOT = require('topluyo-bot');\nconst bot = TopluyoBOT(process.env.TOKEN || require('./.token.json'));\nbot.on('connected', () => console.log('Bot bağlandı!'));\n\n";
+    let code = "// Botluyo Blueprint ile otomatik oluşturuldu\nconst TopluyoBOT = require('topluyo-bot');\nconst bot = TopluyoBOT(process.env.TOKEN || require('./.token.json'));\nbot._hazir = false;\n\nbot.on('connected', () => { bot._hazir = true; console.log('Bot bağlandı! ✅'); });\n\n";
+    
     const getNode = (id) => data.nodes.find(n => n.id === id);
     const getLink = (id) => data.links.find(l => l[0] === id);
 
@@ -66,16 +67,20 @@ function generateBotCode() {
         if (sourceNode.type === "Botluyo_Logic/Get_Word") return `(String(${resolveData(sourceNode.inputs[0]?.link) || "''"}).trim().split(/\\s+/)[(${resolveData(sourceNode.inputs[1]?.link) || "1"}) - 1] ?? '')`;
         if (sourceNode.type === "Botluyo_Logic/Math_Op") return `(Number(${resolveData(sourceNode.inputs[0]?.link) || "0"}) ${sourceNode.widgets_values[0]} Number(${resolveData(sourceNode.inputs[1]?.link) || "0"}))`;
         
-        // YENİ: For-Each Düğümünün Döndürdüğü Değerler (Öğe ve İndeks)
         if (sourceNode.type === "Botluyo_Logic/ForEach") {
-            if (sourceSlot === 1) return `item_${sourceNode.id}`; // 1. Pin: Öğe (Item)
-            if (sourceSlot === 2) return `i_${sourceNode.id}`;    // 2. Pin: İndeks
+            if (sourceSlot === 1) return `item_${sourceNode.id}`;
+            if (sourceSlot === 2) return `i_${sourceNode.id}`;
         }
         return "null";
     }
 
     function traverseExecution(nodeId, indent = "    ") {
         if (!nodeId) return ""; let node = getNode(nodeId); if (!node) return ""; let blockCode = "";
+
+        // YENİ: Print
+        if (node.type === "Botluyo_Logic/Print") {
+            blockCode += `${indent}console.log(${resolveData(node.inputs[1]?.link) || "''"});\n`;
+        }
 
         if (node.type === "Botluyo_Logic/Branch") {
             blockCode += `${indent}if (${resolveData(node.inputs[1]?.link) || "false"}) {\n`;
@@ -86,29 +91,22 @@ function generateBotCode() {
             return blockCode;
         }
 
-        // YENİ: Bekle (Delay)
         if (node.type === "Botluyo_Logic/Delay") {
             let sec = resolveData(node.inputs[1]?.link) || "1";
             blockCode += `${indent}await new Promise(r => setTimeout(r, (${sec}) * 1000));\n`;
-            let nextLink = node.outputs && node.outputs[0]?.links ? node.outputs[0].links[0] : null;
-            if (nextLink) blockCode += traverseExecution(getLink(nextLink)[3], indent);
-            return blockCode;
         }
 
-        // YENİ: For-Each Loop
         if (node.type === "Botluyo_Logic/ForEach") {
             let arrData = resolveData(node.inputs[1]?.link) || "[]";
             blockCode += `${indent}let arr_${node.id} = ${arrData} || [];\n`;
             blockCode += `${indent}for (let i_${node.id} = 0; i_${node.id} < arr_${node.id}.length; i_${node.id}++) {\n`;
             blockCode += `${indent}  let item_${node.id} = arr_${node.id}[i_${node.id}];\n`;
-            
             let bodyLink = node.outputs[0]?.links ? node.outputs[0].links[0] : null;
             blockCode += traverseExecution(bodyLink ? getLink(bodyLink)[3] : null, indent + "  ");
             blockCode += `${indent}}\n`;
-
             let completedLink = node.outputs[3]?.links ? node.outputs[3].links[0] : null;
             blockCode += traverseExecution(completedLink ? getLink(completedLink)[3] : null, indent);
-            return blockCode; // Kendi alt akışlarını yönettiği için buradan döner
+            return blockCode;
         }
 
         if (node.type === "Botluyo_Logic/Set_Variable") {
@@ -129,12 +127,27 @@ function generateBotCode() {
 
     const eventNodes = data.nodes.filter(n => n.type.startsWith("Botluyo_Events/"));
     eventNodes.forEach(eventNode => {
-        let evData = BOT_EVENTS[eventNode.type.split("/")[1]];
-        if (evData) {
-            code += `bot.on('message', async (data) => {\n  if (data.action === '${evData.action}') {\n    let vars = {};\n`;
+        // YENİ: Bağlanınca ve Timer Eventleri
+        if (eventNode.type === "Botluyo_Events/Connected") {
+            code += `bot.on('connected', async () => {\n    let vars = {};\n`;
             let nextLinkInfo = eventNode.outputs && eventNode.outputs[0].links ? eventNode.outputs[0].links[0] : null;
             code += traverseExecution(nextLinkInfo ? getLink(nextLinkInfo)[3] : null, "    ");
-            code += `  }\n});\n\n`;
+            code += `});\n\n`;
+        } else if (eventNode.type === "Botluyo_Events/Timer") {
+            let sec = eventNode.widgets_values[0] || 60;
+            code += `setInterval(async () => {\n    if (!bot._hazir) return;\n    let vars = {};\n`;
+            let nextLinkInfo = eventNode.outputs && eventNode.outputs[0].links ? eventNode.outputs[0].links[0] : null;
+            code += traverseExecution(nextLinkInfo ? getLink(nextLinkInfo)[3] : null, "    ");
+            code += `}, ${sec} * 1000);\n\n`;
+        } else {
+            // Normal Olaylar
+            let evData = BOT_EVENTS[eventNode.type.split("/")[1]];
+            if (evData) {
+                code += `bot.on('message', async (data) => {\n  if (data.action === '${evData.action}') {\n    let vars = {};\n`;
+                let nextLinkInfo = eventNode.outputs && eventNode.outputs[0].links ? eventNode.outputs[0].links[0] : null;
+                code += traverseExecution(nextLinkInfo ? getLink(nextLinkInfo)[3] : null, "    ");
+                code += `  }\n});\n\n`;
+            }
         }
     });
 
