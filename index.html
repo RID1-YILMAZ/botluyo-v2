@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Botluyo v2 - Blueprint Editörü</title>
+    <link rel="stylesheet" href="https://tamats.com/projects/litegraph/css/litegraph.css">
+    <style>
+        body { margin: 0; padding: 0; background-color: #222; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #blueprint-canvas { width: 100vw; height: 100vh; display: block; }
+        .logo { position: absolute; top: 15px; left: 20px; color: rgba(255, 255, 255, 0.5); font-weight: bold; font-size: 24px; pointer-events: none; }
+        #btn-export { position:absolute; top:15px; right:20px; z-index:10; padding:10px 20px; background:#103060; color:white; border:none; border-radius:5px; cursor:pointer; }
+        #code-output { position:absolute; bottom:0; right:0; width:400px; height:50vh; background:rgba(0,0,0,0.8); color:#0f0; margin:0; padding:15px; overflow-y:auto; display:none; pointer-events:none; z-index:10; font-family:monospace; white-space:pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="logo">Botluyo Blueprint</div>
+    <button id="btn-export">💻 Kodu Üret</button>
+    <pre id="code-output"></pre>
+    <canvas id="blueprint-canvas"></canvas>
+
+    <script src="https://tamats.com/projects/litegraph/build/litegraph.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
