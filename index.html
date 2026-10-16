@@ -9,17 +9,36 @@
         body { margin: 0; padding: 0; background-color: #222; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #blueprint-canvas { width: 100vw; height: 100vh; display: block; }
         .logo { position: absolute; top: 15px; left: 20px; color: rgba(255, 255, 255, 0.5); font-weight: bold; font-size: 24px; pointer-events: none; }
-        #btn-export { position:absolute; top:15px; right:20px; z-index:10; padding:10px 20px; background:#103060; color:white; border:none; border-radius:5px; cursor:pointer; }
-        #code-output { position:absolute; bottom:0; right:0; width:400px; height:50vh; background:rgba(0,0,0,0.8); color:#0f0; margin:0; padding:15px; overflow-y:auto; display:none; pointer-events:none; z-index:10; font-family:monospace; white-space:pre-wrap; }
+        .toolbar { position:absolute; top:15px; right:20px; z-index:10; display:flex; gap:10px; }
+        button { padding:10px 15px; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s;}
+        button:hover { transform: translateY(-2px); }
+        #btn-save { background:#2e8b57; }
+        #btn-clear { background:#701010; }
+        #btn-export { background:#103060; }
+        #btn-download { background:#664ba2; }
+        #code-output { position:absolute; bottom:0; right:0; width:40vw; height:40vh; background:rgba(0,0,0,0.9); color:#0f0; margin:0; padding:15px; overflow-y:auto; display:none; z-index:10; font-family:monospace; white-space:pre-wrap; border-top-left-radius: 10px;}
     </style>
 </head>
 <body>
-    <div class="logo">Botluyo Blueprint</div>
-    <button id="btn-export">💻 Kodu Üret</button>
+    <div class="logo">Botluyo Blueprint v2</div>
+    
+    <div class="toolbar">
+        <button id="btn-save">💾 Kaydet</button>
+        <button id="btn-clear">🗑️ Temizle</button>
+        <button id="btn-export">💻 Kodu Gör</button>
+        <button id="btn-download">📦 ZIP İndir</button>
+    </div>
+    
     <pre id="code-output"></pre>
     <canvas id="blueprint-canvas"></canvas>
 
+    <!-- Kütüphaneler -->
     <script src="https://tamats.com/projects/litegraph/build/litegraph.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- Proje Dosyalarımız -->
+    <script src="api.js"></script>
     <script src="logic.js"></script>
     <script src="app.js"></script>
 </body>
