@@ -1,45 +1,84 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Botluyo v2 - Blueprint Editörü</title>
-    <link rel="stylesheet" href="https://tamats.com/projects/litegraph/css/litegraph.css">
-    <style>
-        body { margin: 0; padding: 0; background-color: #222; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #blueprint-canvas { width: 100vw; height: 100vh; display: block; }
-        .logo { position: absolute; top: 15px; left: 20px; color: rgba(255, 255, 255, 0.5); font-weight: bold; font-size: 24px; pointer-events: none; }
-        .toolbar { position:absolute; top:15px; right:20px; z-index:10; display:flex; gap:10px; }
-        button { padding:10px 15px; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s;}
-        button:hover { transform: translateY(-2px); }
-        #btn-save { background:#2e8b57; }
-        #btn-clear { background:#701010; }
-        #btn-export { background:#103060; }
-        #btn-download { background:#664ba2; }
-        #code-output { position:absolute; bottom:0; right:0; width:40vw; height:40vh; background:rgba(0,0,0,0.9); color:#0f0; margin:0; padding:15px; overflow-y:auto; display:none; z-index:10; font-family:monospace; white-space:pre-wrap; border-top-left-radius: 10px;}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#14161c">
+<title>Botluyo v2 - Blueprint Editörü</title>
+<link rel="stylesheet" href="https://tamats.com/projects/litegraph/css/litegraph.css">
+<style>
+:root{--bg:#14161c;--pn:#1e2129;--ln:#2d313c;--tx:#e8eaf0;--mu:#8b91a1;--ac:#7c5cff;--sa:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+#stage{position:fixed;inset:0}
+#blueprint-canvas{display:block;width:100%;height:100%;touch-action:none}
+.bar{position:fixed;left:0;right:0;z-index:20;display:flex;gap:8px;padding:8px 10px;pointer-events:none}
+.bar>*{pointer-events:auto}
+#top{top:var(--sa);align-items:center}
+#dock{bottom:var(--sb);justify-content:center}
+.logo{margin-right:auto;font-weight:700;opacity:.85;pointer-events:none}
+.logo b{color:var(--ac)}
+.btn{min-height:44px;padding:0 14px;border:1px solid var(--ln);border-radius:12px;background:var(--pn);color:var(--tx);font:inherit;font-weight:600;cursor:pointer;box-shadow:0 4px 14px #0006}
+.btn:active{transform:scale(.96)}
+.btn.pri{background:var(--ac);border-color:transparent}
+.btn.bad{color:#ff8d82}
+@media(max-width:480px){.btn{padding:0 10px}#dock{gap:6px}}
+#code{position:fixed;z-index:30;left:0;right:0;bottom:0;height:62dvh;display:none;flex-direction:column;background:var(--pn);border-top:1px solid var(--ln);border-radius:16px 16px 0 0;padding-bottom:var(--sb)}
+#code.open{display:flex}
+.hd{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--ln)}
+.hd h3{margin:0;font-size:14px;margin-right:auto}
+.hd .btn{min-height:36px}
+#warn{display:none;padding:8px 12px;color:#ffd27a;background:#3a2f12;font-size:12px;white-space:pre-wrap;max-height:25%;overflow:auto}
+#code-output{flex:1;margin:0;padding:12px;overflow:auto;color:#9fe8a8;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre;-webkit-overflow-scrolling:touch}
+@media(min-width:900px){#code{left:auto;top:0;height:auto;width:42vw;border-radius:0;border-top:0;border-left:1px solid var(--ln)}}
+#sheet{position:fixed;inset:0;z-index:40;display:none;align-items:flex-end;justify-content:center;background:#0009}
+#sheet.open{display:flex}
+#sheet .box{width:100%;max-width:560px;max-height:82dvh;display:flex;flex-direction:column;background:var(--pn);border-radius:16px 16px 0 0;padding-bottom:var(--sb)}
+#q{margin:10px;padding:12px;border:1px solid var(--ln);border-radius:10px;background:var(--bg);color:var(--tx);font-size:16px}
+#list{overflow:auto;padding:0 10px 10px}
+.cat{margin:12px 4px 4px;color:var(--mu);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+.it{display:block;width:100%;min-height:44px;margin:3px 0;padding:10px 12px;border:1px solid var(--ln);border-radius:10px;background:#252932;color:var(--tx);font:inherit;font-size:15px;text-align:left}
+.it small{display:block;color:var(--mu);font-size:11px}
+@media(min-width:700px){#sheet{align-items:center}#sheet .box{border-radius:16px}}
+#toast{position:fixed;left:50%;bottom:calc(76px + var(--sb));transform:translateX(-50%);z-index:50;padding:10px 16px;border-radius:20px;background:#000d;opacity:0;transition:opacity .25s;pointer-events:none}
+#toast.show{opacity:1}
+.litemenu-entry{padding:10px 14px!important;font-size:15px}
+.graphdialog{left:50%!important;top:18%!important;transform:translateX(-50%);max-width:92vw}
+.graphdialog input,.graphdialog select{font-size:16px}
+</style>
 </head>
 <body>
-    <div class="logo">Botluyo Blueprint v2</div>
-    
-    <div class="toolbar">
-        <button id="btn-save">💾 Kaydet</button>
-        <button id="btn-clear">🗑️ Temizle</button>
-        <button id="btn-export">💻 Kodu Gör</button>
-        <button id="btn-download">📦 ZIP İndir</button>
-    </div>
-    
-    <pre id="code-output"></pre>
-    <canvas id="blueprint-canvas"></canvas>
+<div id="stage"><canvas id="blueprint-canvas"></canvas></div>
 
-    <!-- Kütüphaneler -->
-    <script src="https://tamats.com/projects/litegraph/build/litegraph.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    
-    <!-- Proje Dosyalarımız -->
-    <script src="api.js"></script>
-    <script src="logic.js"></script>
-    <script src="app.js"></script>
+<div class="bar" id="top">
+  <div class="logo">Botluyo <b>Blueprint</b> v2</div>
+  <button class="btn" id="btn-save">💾 Kaydet</button>
+  <button class="btn bad" id="btn-clear">🗑️ Temizle</button>
+</div>
+
+<div class="bar" id="dock">
+  <button class="btn pri" id="btn-add">＋ Ekle</button>
+  <button class="btn" id="btn-del">✖ Sil</button>
+  <button class="btn" id="btn-export">💻 Kod</button>
+  <button class="btn" id="btn-download">📦 ZIP</button>
+</div>
+
+<aside id="code">
+  <div class="hd"><h3>index.js</h3><button class="btn" id="btn-copy">Kopyala</button><button class="btn" id="btn-close">✕</button></div>
+  <div id="warn"></div>
+  <pre id="code-output"></pre>
+</aside>
+
+<div id="sheet"><div class="box"><input id="q" placeholder="Düğüm ara…" autocomplete="off"><div id="list"></div></div></div>
+<div id="toast"></div>
+
+<script src="https://tamats.com/projects/litegraph/build/litegraph.js"></script>
+<!-- Örnek düğümleri HEMEN temizle; logic.js'ten ÖNCE olmalı (eski hatanın sebebi buydu) -->
+<script>LiteGraph.clearRegisteredTypes();</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="api.js"></script>
+<script src="logic.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
